@@ -9,12 +9,14 @@ import sys
 
 import config
 
+
 def confirm_overwrite(filename):
     print(f'{filename} already exists. Do you want to overwrite it? (y/n)')
     user_input = input('> ')
     if user_input != 'y':
         print('Exiting')
         sys.exit()
+
 
 def get_subreddits(reddit):
     subreddits = reddit.get('/subreddits/mine/subscriber')
@@ -29,12 +31,14 @@ def get_subreddits(reddit):
         print('Subreddits retrieved:', len(subreddits_list))
         subreddits = reddit.get('/subreddits/mine/subscriber', params={ 'after': subreddits.after })
 
+
 def get_account_information():
     print('Enter account information for export:')
     username = input('Username\n> ')
     print('Password\n> ', end='')
     password = getpass.getpass(prompt='')
     return (username, password)
+
 
 def write_subreddits_to_file(subreddits, should_overwrite):
     dictionary = {
@@ -46,6 +50,7 @@ def write_subreddits_to_file(subreddits, should_overwrite):
         confirm_overwrite(filename)
     with open(filename, 'w') as f:
         json.dump(dictionary, f)
+
 
 data_directory_name = 'data'
 user_agent = 'reddit-account-migration'
