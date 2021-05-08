@@ -5,6 +5,7 @@ from pathlib import Path
 import argparse
 import getpass
 import json
+import pprint
 import sys
 
 import config
@@ -16,6 +17,21 @@ def confirm_overwrite(filename):
     if user_input != 'y':
         print('Exiting')
         sys.exit()
+
+
+def get_multis(reddit):
+    multis = reddit.get('/api/multi/mine')
+    # pprint.pprint(multis)
+    pprint.pprint(vars(multis[0]))
+    multis_list = []
+    for multi in multis:
+        multis_list.append({
+            'name': multi.,
+            'subreddits': [],
+        })
+        print('Multis retrieved:', len(multis_list))
+        subreddits = reddit.get('/subreddits/mine/subscriber', params={ 'after': subreddits.after })
+    print('Total multis retrieved:', len(multis_list))
 
 
 def get_subreddits(reddit):
@@ -72,8 +88,9 @@ if args.export:
         # username=account_information[0],
         username=config.username,
     )
-    subreddits = get_subreddits(reddit)
-    write_subreddits_to_file(subreddits, args.overwrite)
+    # subreddits = get_subreddits(reddit)
+    # write_subreddits_to_file(subreddits, args.overwrite)
 
     # get my multireddits
     # https://www.reddit.com/dev/api#GET_api_multi_mine
+    multis = get_multis(reddit)
