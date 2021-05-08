@@ -21,17 +21,18 @@ def confirm_overwrite(filename):
 
 def get_multis(reddit):
     multis = reddit.get('/api/multi/mine')
-    # pprint.pprint(multis)
-    pprint.pprint(vars(multis[0]))
     multis_list = []
     for multi in multis:
+        subreddits = []
+        for subreddit in multi.subreddits:
+            subreddits.append(subreddit.url)
         multis_list.append({
-            'name': multi.,
-            'subreddits': [],
+            'name': multi.name,
+            'subreddits': subreddits,
         })
         print('Multis retrieved:', len(multis_list))
-        subreddits = reddit.get('/subreddits/mine/subscriber', params={ 'after': subreddits.after })
     print('Total multis retrieved:', len(multis_list))
+    return multis_list
 
 
 def get_subreddits(reddit):
@@ -54,6 +55,18 @@ def get_account_information():
     print('Password\n> ', end='')
     password = getpass.getpass(prompt='')
     return (username, password)
+
+
+def write_multis_to_file(multis, should_overwrite):
+    dictionary = {
+        'multis': multis
+    }
+    Path(data_directory_name).mkdir(exist_ok=True, parents=True)
+    filename = f'{data_directory_name}/multis.json'
+    if not should_overwrite and exists(filename):
+        confirm_overwrite(filename)
+    with open(filename, 'w') as f:
+        json.dump(dictionary, f)
 
 
 def write_subreddits_to_file(subreddits, should_overwrite):
@@ -91,6 +104,5 @@ if args.export:
     # subreddits = get_subreddits(reddit)
     # write_subreddits_to_file(subreddits, args.overwrite)
 
-    # get my multireddits
-    # https://www.reddit.com/dev/api#GET_api_multi_mine
-    multis = get_multis(reddit)
+    # multis = get_multis(reddit)
+    # write_multis_to_file(multis, args.overwrite)
