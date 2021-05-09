@@ -10,6 +10,7 @@ import praw
 
 import config
 
+# to do normalize Reddit interactions (either API, PRAW API, or praw)
 # to do support multiple api creds, or see if you can just use a single set of api creds
 
 DATA_DIRECTORY_NAME = 'data'
@@ -39,18 +40,18 @@ def confirm_overwrite(message):
 
 def download_multis_from_reddit(reddit):
     '''Download multis from Reddit and return them'''
-    # to do persist privacy setting
-    # to do persist name along with url
     print('Downloading multis from Reddit')
     multis = reddit.get('/api/multi/mine')
     multis_list = []
     for multi in multis:
         subreddits = []
         for subreddit in multi.subreddits:
-            subreddits.append(subreddit.url)
+            subreddits.append(get_subreddit_from_url(subreddit.url))
         multis_list.append({
+            'displayName': multi.display_name,
             'name': multi.name,
             'subreddits': subreddits,
+            'visibility': multi.visibility,
         })
         print('Multis downloaded:', len(multis_list))
     print('Total multis downloaded:', len(multis_list))
@@ -68,7 +69,7 @@ def download_subreddits_from_reddit(reddit):
                 print('Total subreddits downloaded:', len(subreddits_list))
                 return subreddits_list
             else:
-                subreddits_list.append(subreddit.url)
+                subreddits_list.append(get_subreddit_from_url(subreddit.url))
         print('Subreddits downloaded:', len(subreddits_list))
         subreddits = reddit.get('/subreddits/mine/subscriber', params={ 'after': subreddits.after })
 
@@ -80,6 +81,10 @@ def get_multis_from_file():
         dictionary = json.load(f)
         multis = dictionary['multis']
         return multis
+
+
+def get_subreddit_from_url(subreddit):
+    return subreddit.split('/')[-2]
 
 
 def get_subreddits_from_file():
@@ -108,6 +113,8 @@ def upload_multis_to_reddit(multis, reddit, should_overwrite):
     multis_uploaded_count = 0
     for multi in multis:
         # create the multi
+        reddit.multireddit.create('testingss', 'Games')
+        break # debug
         for subreddit in multi['subreddits']:
             # add the subreddit to the multi
             print(subreddit)
@@ -123,7 +130,6 @@ def upload_subreddits_to_reddit(subreddits, reddit, should_overwrite):
         confirm_overwrite(REDDIT_OVERWRITE_MESSAGE)
     subreddits_uploaded_count = 0
     for subreddit in subreddits:
-        subreddit = subreddit.split('/')[-2]
         reddit.subreddit(subreddit).subscribe()
         subreddits_uploaded_count += 1
         print('Subreddits uploaded:', subreddits_uploaded_count)
@@ -138,7 +144,7 @@ def write_multis_to_file(multis, should_overwrite):
     Path(DATA_DIRECTORY_NAME).mkdir(exist_ok=True, parents=True)
     if not should_overwrite and exists(multis_filename):
         confirm_overwrite(f'{multis_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}')
-    with open(filename, 'w') as f:
+    with open(multis_filename, 'w') as f:
         json.dump(dictionary, f)
 
 
@@ -172,10 +178,10 @@ if args.download:
         # username=account_information[0],
         username=config.username,
     )
-    # multis = download_multis_from_reddit(reddit)
-    # write_multis_to_file(multis, args.overwrite)
-    # subreddits = download_subreddits_from_reddit(reddit)
-    # write_subreddits_to_file(subreddits, args.overwrite)
+    multis = download_multis_from_reddit(reddit)
+    write_multis_to_file(multis, args.overwrite)
+    subreddits = download_subreddits_from_reddit(reddit)
+    write_subreddits_to_file(subreddits, args.overwrite)
 
 if args.upload:
     # account_information = get_account_information()
