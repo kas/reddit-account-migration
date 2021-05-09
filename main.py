@@ -1,5 +1,3 @@
-import praw
-
 from os.path import exists
 from pathlib import Path
 import argparse
@@ -8,26 +6,40 @@ import json
 import pprint
 import sys
 
+import praw
+
 import config
 
 # to do support multiple api creds, or see if you can just use a single set of api creds
 
+DATA_DIRECTORY_NAME = 'data'
+FILE_OVERWRITE_MESSAGE_SUFFIX = ' already exists. Do you want to overwrite it?'
+REDDIT_OVERWRITE_MESSAGE = 'Do you want to upload this data to your Reddit account?'
+USER_AGENT = 'reddit-account-migration'
+
+multis_filename = f'{DATA_DIRECTORY_NAME}/multis.json'
+subreddits_filename = f'{DATA_DIRECTORY_NAME}/subreddits.json'
+
 
 def confirm_exists(filename):
+    '''If the filename doesn't exist then print an error message and exit'''
     if not exists(filename):
         print(f'Error: {filename} doesn\'t exist. Exiting.')
         sys.exit()
 
 
-def confirm_overwrite(filename):
-    print(f'{filename} already exists. Do you want to overwrite it? (y/n)')
-    user_input = input('> ')
+def confirm_overwrite(message):
+    '''Prompt the user to confirm if the resource should be overwritten and exit if not'''
+    print(message)
+    user_input = input('(y/n)\n> ')
     if user_input != 'y':
         print('Exiting')
         sys.exit()
 
 
 def download_multis_from_reddit(reddit):
+    '''Download multis from Reddit and return them'''
+    print('Downloading multis from Reddit')
     multis = reddit.get('/api/multi/mine')
     multis_list = []
     for multi in multis:
@@ -44,6 +56,8 @@ def download_multis_from_reddit(reddit):
 
 
 def download_subreddits_from_reddit(reddit):
+    '''Download subreddits from Reddit and return them'''
+    print('Downloading subreddits from Reddit')
     subreddits = reddit.get('/subreddits/mine/subscriber')
     subreddits_list = []
     while True:
@@ -58,6 +72,7 @@ def download_subreddits_from_reddit(reddit):
 
 
 def get_multis_from_file():
+    '''Get multis from file and return them'''
     confirm_exists(multis_filename)
     with open(multis_filename) as f:
         dictionary = json.load(f)
@@ -66,6 +81,7 @@ def get_multis_from_file():
 
 
 def get_subreddits_from_file():
+    '''Get subreddits from file and return them'''
     confirm_exists(subreddits_filename)
     with open(subreddits_filename) as f:
         dictionary = json.load(f)
@@ -73,7 +89,8 @@ def get_subreddits_from_file():
         return subreddits
 
 
-def get_account_information():
+def get_account_credentials():
+    '''Prompt the user to enter their Reddit account credentials and return them'''
     print('Enter account information for download:')
     username = input('Username\n> ')
     print('Password\n> ', end='')
@@ -81,8 +98,27 @@ def get_account_information():
     return (username, password)
 
 
-def upload_subreddits_to_reddit(subreddits, reddit):
-    # to do confirm before uploading
+def upload_multis_to_reddit(multis, reddit, should_overwrite):
+    '''Upload multis to Reddit'''
+    print('Uploading multis to Reddit')
+    if not should_overwrite:
+        confirm_overwrite(REDDIT_OVERWRITE_MESSAGE)
+    multis_uploaded_count = 0
+    for multi in multis:
+        # create the multi
+        for subreddit in multi['subreddits']:
+            # add the subreddit to the multi
+            print(subreddit)
+        multis_uploaded_count += 1
+        print('Multis uploaded:', multis_uploaded_count)
+    print('Total multis uploaded:', multis_uploaded_count)
+
+
+def upload_subreddits_to_reddit(subreddits, reddit, should_overwrite):
+    '''Upload subreddits to Reddit'''
+    print('Uploading subreddits to Reddit')
+    if not should_overwrite:
+        confirm_overwrite(REDDIT_OVERWRITE_MESSAGE)
     subreddits_uploaded_count = 0
     for subreddit in subreddits:
         subreddit = subreddit.split('/')[-2]
@@ -93,31 +129,28 @@ def upload_subreddits_to_reddit(subreddits, reddit):
 
 
 def write_multis_to_file(multis, should_overwrite):
+    '''Write multis to file'''
     dictionary = {
         'multis': multis
     }
-    Path(data_directory_name).mkdir(exist_ok=True, parents=True)
+    Path(DATA_DIRECTORY_NAME).mkdir(exist_ok=True, parents=True)
     if not should_overwrite and exists(multis_filename):
-        confirm_overwrite(filename)
+        confirm_overwrite(f'{multis_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}')
     with open(filename, 'w') as f:
         json.dump(dictionary, f)
 
 
 def write_subreddits_to_file(subreddits, should_overwrite):
+    '''Write subreddits to file'''
     dictionary = {
         'subreddits': subreddits
     }
-    Path(data_directory_name).mkdir(exist_ok=True, parents=True)
+    Path(DATA_DIRECTORY_NAME).mkdir(exist_ok=True, parents=True)
     if not should_overwrite and exists(subreddits_filename):
-        confirm_overwrite(filename)
+        confirm_overwrite(f'{subreddits_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}')
     with open(filename, 'w') as f:
         json.dump(dictionary, f)
 
-
-data_directory_name = 'data'
-multis_filename = f'{data_directory_name}/multis.json'
-subreddits_filename = f'{data_directory_name}/subreddits.json'
-user_agent = 'reddit-account-migration'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--download', action='store_true', help='Download data')
@@ -133,7 +166,7 @@ if args.download:
         client_secret=config.client_secret,
         # password=account_information[1],
         password=config.password,
-        user_agent=user_agent,
+        user_agent=USER_AGENT,
         # username=account_information[0],
         username=config.username,
     )
@@ -149,11 +182,11 @@ if args.upload:
         client_secret=config.client_secret,
         # password=account_information[1],
         password=config.password,
-        user_agent=user_agent,
+        user_agent=USER_AGENT,
         # username=account_information[0],
         username=config.username,
     )
-    # multis = get_multis_from_file()
-    # upload_multis_to_reddit(multis, reddit)
-    subreddits = get_subreddits_from_file()
-    upload_subreddits_to_reddit(subreddits, reddit)
+    multis = get_multis_from_file()
+    upload_multis_to_reddit(multis, reddit, args.overwrite)
+    # subreddits = get_subreddits_from_file()
+    # upload_subreddits_to_reddit(subreddits, reddit, args.overwrite)
