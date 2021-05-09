@@ -39,6 +39,7 @@ def confirm_overwrite(message):
 
 def download_multis_from_reddit(reddit):
     '''Download multis from Reddit and return them'''
+    # to do persist privacy setting
     print('Downloading multis from Reddit')
     multis = reddit.get('/api/multi/mine')
     multis_list = []
