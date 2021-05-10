@@ -31,7 +31,7 @@ def confirm_exists(filename):
 
 
 def confirm_overwrite(message, reddit=None):
-    """Prompt the user to confirm if the resource should be overwritten and exit if not.
+    """Prompt the user to confirm if the resource should be overwritten and return the user's decision.
     
     Keyword arguments:
     message -- the message to prompt the user with
@@ -41,8 +41,7 @@ def confirm_overwrite(message, reddit=None):
     if reddit:
         print('Reddit account:', reddit.user.me().name)
     user_input = input('(y/n)\n> ')
-    if user_input != 'y':
-        exit_script()
+    return user_input == 'y'
 
 
 def download_multireddits_from_reddit(reddit):
@@ -154,7 +153,9 @@ def upload_multireddits_to_reddit(multireddits, reddit, should_overwrite):
     existing_multireddits = [existing_multireddit['displayName'] for existing_multireddit in existing_multireddits]
     print('Uploading multireddits to Reddit')
     if not should_overwrite:
-        confirm_overwrite(REDDIT_OVERWRITE_MESSAGE, reddit)
+        should_overwrite = confirm_overwrite(REDDIT_OVERWRITE_MESSAGE, reddit)
+        if not should_overwrite:
+            return
     multireddits_uploaded_count = 0
     for multireddit in multireddits:
         if multireddit['displayName'] in existing_multireddits:
@@ -176,7 +177,9 @@ def upload_subreddits_to_reddit(reddit, should_overwrite, subreddits):
     """
     print('Uploading subreddits to Reddit')
     if not should_overwrite:
-        confirm_overwrite(REDDIT_OVERWRITE_MESSAGE, reddit)
+        should_overwrite = confirm_overwrite(REDDIT_OVERWRITE_MESSAGE, reddit)
+        if not should_overwrite:
+            return
     subreddit_model_list = [reddit.subreddit(subreddit) for subreddit in subreddits[1:]]
     reddit.subreddit(subreddits[0]).subscribe(other_subreddits=subreddit_model_list)
     print('Uploaded all subreddits')
@@ -194,7 +197,9 @@ def write_multireddits_to_file(multireddits, should_overwrite):
     }
     Path(DATA_DIRECTORY_NAME).mkdir(exist_ok=True, parents=True)
     if not should_overwrite and exists(multireddits_filename):
-        confirm_overwrite(f'{multireddits_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}')
+        should_overwrite = confirm_overwrite(f'{multireddits_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}')
+        if not should_overwrite:
+            return
     with open(multireddits_filename, 'w') as f:
         json.dump(dictionary, f)
 
@@ -211,7 +216,9 @@ def write_subreddits_to_file(should_overwrite, subreddits):
     }
     Path(DATA_DIRECTORY_NAME).mkdir(exist_ok=True, parents=True)
     if not should_overwrite and exists(subreddits_filename):
-        confirm_overwrite(f'{subreddits_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}')
+        should_overwrite = confirm_overwrite(f'{subreddits_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}')
+        if not should_overwrite:
+            return
     with open(subreddits_filename, 'w') as f:
         json.dump(dictionary, f)
 
