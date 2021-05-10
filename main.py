@@ -181,6 +181,7 @@ def upload_subreddits_to_reddit(reddit, should_overwrite, subreddits):
         if not should_overwrite:
             return
     subreddit_model_list = [reddit.subreddit(subreddit) for subreddit in subreddits[1:]]
+    # to do fix prawcore.exceptions.Forbidden: received 403 HTTP response when trying to subscribe
     reddit.subreddit(subreddits[0]).subscribe(other_subreddits=subreddit_model_list)
     print('Uploaded all subreddits')
 
