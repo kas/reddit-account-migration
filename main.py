@@ -138,19 +138,24 @@ def get_subreddits_from_file():
 
 
 def upload_multireddits_to_reddit(multireddits, reddit, should_overwrite):
-    """Upload multireddits to Reddit.
+    """Upload multireddits to Reddit, skipping any multireddit that already exists.
     
     Keyword arguments:
     multireddits -- the multireddits to upload to Reddit
     reddit -- the PRAW Reddit instance
     should_overwrite -- whether or not the function should upload the multireddits to Reddit without confirming
     """
-    # to do skip multireddits that already exist in the upload account
+    print('Downloading existing multireddits to prevent collisions')
+    existing_multireddits = download_multireddits_from_reddit(reddit)
+    existing_multireddits = [existing_multireddit['displayName'] for existing_multireddit in existing_multireddits]
     print('Uploading multireddits to Reddit')
     if not should_overwrite:
         confirm_overwrite(REDDIT_OVERWRITE_MESSAGE)
     multireddits_uploaded_count = 0
     for multireddit in multireddits:
+        if multireddit['displayName'] in existing_multireddits:
+            print(f'Multireddit {multireddit["displayName"]} already exists, skipping')
+            continue
         reddit.multireddit.create(multireddit['displayName'], multireddit['subreddits'], visibility=multireddit['visibility'])
         multireddits_uploaded_count += 1
         print('Multireddits uploaded:', multireddits_uploaded_count)
