@@ -11,6 +11,7 @@ import config
 
 DATA_DIRECTORY_NAME = 'data'
 FILE_OVERWRITE_MESSAGE_SUFFIX = ' already exists. Do you want to overwrite it?'
+FOUND_ACCOUNT_CREDENTIALS_MESSAGE = 'Found account credentials from config.py'
 GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX = 'Enter account credentials for '
 REDDIT_OVERWRITE_MESSAGE = 'Do you want to upload this data to your Reddit account?'
 USER_AGENT = 'reddit-account-migration'
@@ -29,13 +30,16 @@ def confirm_exists(filename):
         exit_script(f"Error: {filename} doesn't exist. Exiting.")
 
 
-def confirm_overwrite(message):
+def confirm_overwrite(message, reddit=None):
     """Prompt the user to confirm if the resource should be overwritten and exit if not.
     
     Keyword arguments:
     message -- the message to prompt the user with
+    reddit -- the PRAW Reddit instance (default None)
     """
     print(message)
+    if reddit:
+        print('Reddit account:', reddit.user.me().name)
     user_input = input('(y/n)\n> ')
     if user_input != 'y':
         exit_script()
@@ -150,7 +154,7 @@ def upload_multireddits_to_reddit(multireddits, reddit, should_overwrite):
     existing_multireddits = [existing_multireddit['displayName'] for existing_multireddit in existing_multireddits]
     print('Uploading multireddits to Reddit')
     if not should_overwrite:
-        confirm_overwrite(REDDIT_OVERWRITE_MESSAGE)
+        confirm_overwrite(REDDIT_OVERWRITE_MESSAGE, reddit)
     multireddits_uploaded_count = 0
     for multireddit in multireddits:
         if multireddit['displayName'] in existing_multireddits:
@@ -172,7 +176,7 @@ def upload_subreddits_to_reddit(reddit, should_overwrite, subreddits):
     """
     print('Uploading subreddits to Reddit')
     if not should_overwrite:
-        confirm_overwrite(REDDIT_OVERWRITE_MESSAGE)
+        confirm_overwrite(REDDIT_OVERWRITE_MESSAGE, reddit)
     subreddit_model_list = [reddit.subreddit(subreddit) for subreddit in subreddits[1:]]
     reddit.subreddit(subreddits[0]).subscribe(other_subreddits=subreddit_model_list)
     print('Uploaded all subreddits')
@@ -219,8 +223,10 @@ parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite da
 args = parser.parse_args()
 
 if args.download:
+    print('Downloading data from Reddit')
     account_credentials = None
     if hasattr(config, 'DOWNLOAD_PASSWORD') and hasattr(config, 'DOWNLOAD_USERNAME'):
+        print(FOUND_ACCOUNT_CREDENTIALS_MESSAGE)
         account_credentials = (config.DOWNLOAD_PASSWORD, config.DOWNLOAD_USERNAME)
     else:
         account_credentials = get_account_credentials(f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}download:')
@@ -237,8 +243,10 @@ if args.download:
     write_subreddits_to_file(args.overwrite, subreddits)
 
 if args.upload:
+    print('Uploading data to Reddit')
     account_credentials = None
     if hasattr(config, 'UPLOAD_PASSWORD') and hasattr(config, 'UPLOAD_USERNAME'):
+        print(FOUND_ACCOUNT_CREDENTIALS_MESSAGE)
         account_credentials = (config.UPLOAD_PASSWORD, config.UPLOAD_USERNAME)
     else:
         account_credentials = get_account_credentials(f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}upload:')
