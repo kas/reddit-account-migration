@@ -20,13 +20,21 @@ subreddits_filename = f'{DATA_DIRECTORY_NAME}/subreddits.json'
 
 
 def confirm_exists(filename):
-    '''If the filename doesn't exist then print an error message and exit'''
+    """Print an error message and exit if the filename doesn't exist.
+    
+    Keyword arguments:
+    filename -- the filename
+    """
     if not exists(filename):
         exit_script(f"Error: {filename} doesn't exist. Exiting.")
 
 
 def confirm_overwrite(message):
-    '''Prompt the user to confirm if the resource should be overwritten and exit if not'''
+    """Prompt the user to confirm if the resource should be overwritten and exit if not.
+    
+    Keyword arguments:
+    message -- the message to prompt the user with
+    """
     print(message)
     user_input = input('(y/n)\n> ')
     if user_input != 'y':
@@ -34,7 +42,11 @@ def confirm_overwrite(message):
 
 
 def download_multireddits_from_reddit(reddit):
-    '''Download multireddits from Reddit and return them'''
+    """Download multireddits from Reddit and return them.
+    
+    Keyword arguments:
+    reddit -- the PRAW Reddit instance
+    """
     print('Downloading multireddits from Reddit')
     multireddits = reddit.user.multireddits()
     multireddits_list = []
@@ -52,7 +64,11 @@ def download_multireddits_from_reddit(reddit):
 
 
 def download_subreddits_from_reddit(reddit):
-    '''Download subreddits from Reddit and return them'''
+    """Download subreddits from Reddit and return them.
+    
+    Keyword arguments:
+    reddit -- the PRAW Reddit instance
+    """
     print('Downloading subreddits from Reddit')
     subreddits = reddit.user.subreddits(limit=None)
     subreddits_list = []
@@ -64,7 +80,11 @@ def download_subreddits_from_reddit(reddit):
 
 
 def exit_script(message=None):
-    '''Print a message and exit'''
+    """Print a message and exit.
+    
+    Keyword arguments:
+    message -- the message to print before exiting (default None)
+    """
     if message:
         print(message)
     else:
@@ -73,7 +93,11 @@ def exit_script(message=None):
 
 
 def get_account_credentials(message):
-    '''Prompt the user to enter their Reddit account credentials and return them'''
+    """Prompt the user to enter their Reddit account credentials and return them.
+    
+    Keyword arguments:
+    message -- the message to prompt the user with
+    """
     print(message)
     username = input('Username\n> ')
     confirm_password, password = get_password()
@@ -87,7 +111,7 @@ def get_account_credentials(message):
 
 
 def get_multireddits_from_file():
-    '''Get multireddits from file and return them'''
+    """Get multireddits from file and return them."""
     confirm_exists(multireddits_filename)
     with open(multireddits_filename) as f:
         dictionary = json.load(f)
@@ -96,7 +120,7 @@ def get_multireddits_from_file():
 
 
 def get_password():
-    '''Prompt the user to enter their Reddit account password and return it'''
+    """Prompt the user to enter their Reddit account password and return it."""
     print('Password\n> ', end='')
     password = getpass.getpass(prompt='')
     print('Confirm password\n>', end='')
@@ -105,7 +129,7 @@ def get_password():
 
 
 def get_subreddits_from_file():
-    '''Get subreddits from file and return them'''
+    """Get subreddits from file and return them."""
     confirm_exists(subreddits_filename)
     with open(subreddits_filename) as f:
         dictionary = json.load(f)
@@ -114,7 +138,13 @@ def get_subreddits_from_file():
 
 
 def upload_multireddits_to_reddit(multireddits, reddit, should_overwrite):
-    '''Upload multireddits to Reddit'''
+    """Upload multireddits to Reddit.
+    
+    Keyword arguments:
+    multireddits -- the multireddits to upload to Reddit
+    reddit -- the PRAW Reddit instance
+    should_overwrite -- whether or not the function should upload the multireddits to Reddit without confirming
+    """
     # to do skip multireddits that already exist in the upload account
     print('Uploading multireddits to Reddit')
     if not should_overwrite:
@@ -128,7 +158,13 @@ def upload_multireddits_to_reddit(multireddits, reddit, should_overwrite):
 
 
 def upload_subreddits_to_reddit(reddit, should_overwrite, subreddits):
-    '''Upload subreddits to Reddit'''
+    """Upload subreddits to Reddit.
+    
+    Keyword arguments:
+    reddit -- the PRAW Reddit instance
+    should_overwrite -- whether or not the function should upload the subreddits to Reddit without confirming
+    subreddits -- the subreddits to upload to Reddit
+    """
     print('Uploading subreddits to Reddit')
     if not should_overwrite:
         confirm_overwrite(REDDIT_OVERWRITE_MESSAGE)
@@ -138,7 +174,12 @@ def upload_subreddits_to_reddit(reddit, should_overwrite, subreddits):
 
 
 def write_multireddits_to_file(multireddits, should_overwrite):
-    '''Write multireddits to file'''
+    """Write multireddits to file.
+    
+    Keyword arguments:
+    multireddits -- the multireddits to save to the file
+    should_overwrite -- whether or not the function should write the multireddits to the file without confirming
+    """
     dictionary = {
         'multireddits': multireddits
     }
@@ -150,7 +191,12 @@ def write_multireddits_to_file(multireddits, should_overwrite):
 
 
 def write_subreddits_to_file(should_overwrite, subreddits):
-    '''Write subreddits to file'''
+    """Write subreddits to file.
+    
+    Keyword arguments:
+    should_overwrite -- whether or not the function should write the subreddits to the file without confirming
+    subreddits -- the subreddits to save to the file
+    """
     dictionary = {
         'subreddits': subreddits
     }
