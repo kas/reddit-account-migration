@@ -12,6 +12,7 @@ import config
 
 # to do handle invalid password
 # to do handle invalid username
+# to do add blocked users
 
 DATA_DIRECTORY_NAME = 'data'
 FILE_OVERWRITE_MESSAGE_SUFFIX = ' already exists. Do you want to overwrite it?'
