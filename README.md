@@ -1,7 +1,7 @@
 # reddit-account-migration
 ## How to use
 1. Clone the repository
-1. [Get a Reddit client ID and client secret for the account you're downloading from and the account you're uploading to](https://github.com/reddit-archive/reddit/wiki/OAuth2-Quick-Start-Example#first-steps)
+1. [Get a Reddit client ID and client secret for the account you're downloading from and for the account you're uploading to](https://github.com/reddit-archive/reddit/wiki/OAuth2-Quick-Start-Example#first-steps)
 1. Paste your client IDs and client secrets in a new file named config.py in the root of the repository (DO NOT COMMIT THIS FILE)
 ```
 DOWNLOAD_CLIENT_ID = ''
