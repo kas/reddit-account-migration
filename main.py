@@ -282,7 +282,7 @@ skipped_resources = {
 if args.download:
     print('Downloading data from Reddit')
     account_credentials = None
-    if hasattr(config, 'DOWNLOAD_PASSWORD') and hasattr(config, 'DOWNLOAD_USERNAME'):
+    if hasattr(config, 'DOWNLOAD_PASSWORD') and config.DOWNLOAD_PASSWORD and hasattr(config, 'DOWNLOAD_USERNAME') and config.DOWNLOAD_USERNAME:
         print(FOUND_ACCOUNT_CREDENTIALS_MESSAGE)
         account_credentials = (config.DOWNLOAD_PASSWORD, config.DOWNLOAD_USERNAME)
     else:
@@ -302,7 +302,7 @@ if args.download:
 if args.upload:
     print_message_prepend_newline('Uploading data to Reddit', args.download)
     account_credentials = None
-    if hasattr(config, 'UPLOAD_PASSWORD') and hasattr(config, 'UPLOAD_USERNAME'):
+    if hasattr(config, 'UPLOAD_PASSWORD') and config.UPLOAD_PASSWORD and hasattr(config, 'UPLOAD_USERNAME') and config.UPLOAD_USERNAME:
         print(FOUND_ACCOUNT_CREDENTIALS_MESSAGE)
         account_credentials = (config.UPLOAD_PASSWORD, config.UPLOAD_USERNAME)
     else:
