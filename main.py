@@ -7,33 +7,44 @@ import sys
 import time
 
 import praw
+import prawcore
 
 import config
 
-# to do handle invalid password
-# to do handle invalid username
-# to do add blocked users
-
+BLOCKED_USERS_KEY = 'blockedUsers'
 DATA_DIRECTORY_NAME = 'data'
-FILE_OVERWRITE_MESSAGE_SUFFIX = ' already exists. Do you want to overwrite it?'
-FOUND_ACCOUNT_CREDENTIALS_MESSAGE = 'Found account credentials from config.py'
-GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX = '\nEnter account credentials for '
-REDDIT_OVERWRITE_MESSAGE = '\nDo you want to upload this data to your Reddit account?'
+DISPLAY_NAME_KEY = 'displayName'
+DOWNLOAD_PASSWORD_VARIABLE_NAME = 'DOWNLOAD_PASSWORD'
+DOWNLOAD_USERNAME_VARIABLE_NAME = 'DOWNLOAD_USERNAME'
+FOUND_ACCOUNT_CREDENTIALS_MESSAGE = 'Found Reddit account credentials from config.py'
+GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX = '\nEnter Reddit account credentials for '
+IS_QUARANTINED_KEY = 'isQuarantined'
+MULTIREDDITS_KEY = 'multireddits'
+SUBREDDIT_TYPE_KEY = 'subredditType'
+SUBREDDITS_KEY = 'subreddits'
+UPLOAD_PASSWORD_VARIABLE_NAME = 'UPLOAD_PASSWORD'
+UPLOAD_USERNAME_VARIABLE_NAME = 'UPLOAD_USERNAME'
 USER_AGENT = 'reddit-account-migration'
+VISIBILITY_KEY = 'visibility'
 
-multireddits_filename = f'{DATA_DIRECTORY_NAME}/multireddits.json'
-skipped_resources_filename = f'{DATA_DIRECTORY_NAME}/skipped-resources.json'
-subreddits_filename = f'{DATA_DIRECTORY_NAME}/subreddits.json'
+BLOCKED_USERS_FILENAME = f'{DATA_DIRECTORY_NAME}/blocked-users.json'
+GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD = f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}download:'
+GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD = f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}upload:'
+MULTIREDDITS_FILENAME = f'{DATA_DIRECTORY_NAME}/multireddits.json'
+SKIPPED_RESOURCES_FILENAME = f'{DATA_DIRECTORY_NAME}/skipped-resources.json'
+SUBREDDITS_FILENAME = f'{DATA_DIRECTORY_NAME}/subreddits.json'
 
 
-def confirm_exists(filename):
-    """Print an error message and exit if the filename doesn't exist.
+def download_blocked_users_from_reddit(reddit):
+    """Download blocked users from Reddit and return them.
     
     Keyword arguments:
-    filename -- the filename
+    reddit -- the PRAW Reddit instance
     """
-    if not exists(filename):
-        exit_script(f"Error: {filename} doesn't exist. Exiting.")
+    print('\nDownloading blocked users from Reddit')
+    blocked_users = [blocked_user.name for blocked_user in reddit.user.blocked()]
+    print('Total blocked users downloaded:', len(blocked_users))
+    return blocked_users
  
 
 def download_multireddits_from_reddit(reddit, should_prepend_newline=True):
@@ -50,9 +61,9 @@ def download_multireddits_from_reddit(reddit, should_prepend_newline=True):
         subreddits = []
         [subreddits.append(subreddit.display_name) for subreddit in multireddit.subreddits]        
         multireddits_list.append({
-            'displayName': multireddit.display_name,
-            'subreddits': subreddits,
-            'visibility': multireddit.visibility,
+            DISPLAY_NAME_KEY: multireddit.display_name,
+            SUBREDDITS_KEY: subreddits,
+            VISIBILITY_KEY: multireddit.visibility,
         })
         print('Multireddits downloaded:', len(multireddits_list))
     print('Total multireddits downloaded:', len(multireddits_list))
@@ -70,9 +81,9 @@ def download_subreddits_from_reddit(reddit):
     subreddits_list = []
     for subreddit in subreddits:
         subreddits_list.append({
-            'displayName': subreddit.display_name,
-            'isQuarantined': subreddit.quarantine,
-            'subredditType': subreddit.subreddit_type,
+            DISPLAY_NAME_KEY: subreddit.display_name,
+            IS_QUARANTINED_KEY: subreddit.quarantine,
+            SUBREDDIT_TYPE_KEY: subreddit.subreddit_type,
         })
         print('Subreddits downloaded:', len(subreddits_list))
     print('Total subreddits downloaded:', len(subreddits_list))
@@ -110,13 +121,20 @@ def get_account_credentials(message):
     return (password, username)
 
 
-def get_multireddits_from_file():
-    """Get multireddits from file and return them."""
-    confirm_exists(multireddits_filename)
-    with open(multireddits_filename) as f:
+def get_from_file(filename, key):
+    """Get the resource from the filename and return it.
+    
+    Keyword arguments:
+    filename -- the filename
+    key -- the key of the resource
+    """
+    if not exists(filename):
+        exit_script(f"Error: {filename} doesn't exist. Exiting.")
+    with open(filename) as f:
         dictionary = json.load(f)
-        multireddits = dictionary['multireddits']
-        return multireddits
+        resource = dictionary[key]
+        return resource
+    return resource
 
 
 def get_password():
@@ -128,13 +146,32 @@ def get_password():
     return (confirm_password, password)
 
 
-def get_subreddits_from_file():
-    """Get subreddits from file and return them."""
-    confirm_exists(subreddits_filename)
-    with open(subreddits_filename) as f:
-        dictionary = json.load(f)
-        subreddits = dictionary['subreddits']
-        return subreddits
+def get_reddit(account_credentials, client_id, client_secret, message):
+    """Get the PRAW Reddit instance, allowing the user to enter their Reddit account credentials again if authentication fails.
+    
+    Keyword arguments:
+    account_credentials -- the Reddit account credentials
+    client_id -- the client ID for the Reddit app
+    client_secret -- the client secret for the Reddit app
+    message -- the message to prompt the user with if authentication fails
+    """
+    while True:
+        try:
+            reddit = praw.Reddit(
+                client_id=client_id,
+                client_secret=client_secret,
+                password=account_credentials[0],
+                user_agent=USER_AGENT,
+                username=account_credentials[1],
+            )
+            reddit.user.me()
+            return reddit
+        except prawcore.OAuthException:
+            print('\nError: Authentication failed. Would you like to try entering your Reddit account credentials again? (y/n)')
+            user_input = input('> ')
+            if user_input == 'n':
+                exit_script()
+            account_credentials = get_account_credentials(message)
 
 
 def print_message_prepend_newline(message, should_prepend_newline=True):
@@ -148,11 +185,11 @@ def print_message_prepend_newline(message, should_prepend_newline=True):
     print(message)
 
 
-def should_overwrite(message=REDDIT_OVERWRITE_MESSAGE, reddit=None):
+def should_overwrite(message='\nDo you want to upload this data to your Reddit account?', reddit=None):
     """Return whether or not the resource should be overwritten.
     
     Keyword arguments:
-    message -- the message to prompt the user with (default REDDIT_OVERWRITE_MESSAGE)
+    message -- the message to prompt the user with (default Reddit overwrite message string)
     reddit -- the PRAW Reddit instance (default None)
     """
     if not args.overwrite:
@@ -162,6 +199,24 @@ def should_overwrite(message=REDDIT_OVERWRITE_MESSAGE, reddit=None):
         user_input = input('(y/n)\n> ')
         return user_input == 'y'
     return True
+
+
+def upload_blocked_users_to_reddit(blocked_users, reddit):
+    """Upload blocked users to Reddit.
+    
+    Keyword arguments:
+    blocked_users -- the blocked users to upload to Reddit
+    reddit -- the PRAW Reddit instance
+    """
+    print('\nUploading blocked users to Reddit')
+    if not should_overwrite():
+        return
+    blocked_users_uploaded_count = 0
+    for blocked_user in blocked_users:
+        reddit.redditor(blocked_user).block()
+        blocked_users_uploaded_count += 1
+        print('Blocked users uploaded:', blocked_users_uploaded_count)
+    print('Total blocked users uploaded:', blocked_users_uploaded_count)
 
 
 def upload_multireddits_to_reddit(multireddits, reddit):
@@ -174,16 +229,16 @@ def upload_multireddits_to_reddit(multireddits, reddit):
     print('\nUploading multireddits to Reddit')
     print('Downloading existing multireddits to prevent collisions')
     existing_multireddits = download_multireddits_from_reddit(reddit, False)
-    existing_multireddits = [existing_multireddit['displayName'] for existing_multireddit in existing_multireddits]
+    existing_multireddits = [existing_multireddit[DISPLAY_NAME_KEY] for existing_multireddit in existing_multireddits]
     if not should_overwrite():
         return
     multireddits_uploaded_count = 0
     for multireddit in multireddits:
-        if multireddit['displayName'] in existing_multireddits:
-            print(f'Skipping multireddit {multireddit["displayName"]} as it already exists')
-            skipped_resources['multireddits'].append(multireddit)
+        if multireddit[DISPLAY_NAME_KEY] in existing_multireddits:
+            print(f'Skipping multireddit {multireddit[DISPLAY_NAME_KEY]} as it already exists')
+            skipped_resources[MULTIREDDITS_KEY].append(multireddit)
             continue
-        reddit.multireddit.create(multireddit['displayName'], multireddit['subreddits'], visibility=multireddit['visibility'])
+        reddit.multireddit.create(multireddit[DISPLAY_NAME_KEY], multireddit[SUBREDDITS_KEY], visibility=multireddit[VISIBILITY_KEY])
         multireddits_uploaded_count += 1
         print('Multireddits uploaded:', multireddits_uploaded_count)
     print('Total multireddits uploaded:', multireddits_uploaded_count)
@@ -201,14 +256,14 @@ def upload_subreddits_to_reddit(reddit, subreddits):
         return
     subreddit_model_list = []
     for subreddit in subreddits:
-        if subreddit['isQuarantined']:
-            print(f"Skipping subreddit {subreddit['displayName']} as it's quarantined")
-        elif subreddit['subredditType'] != 'private':
-            subreddit_model_list.append(reddit.subreddit(subreddit['displayName']))
+        if subreddit[IS_QUARANTINED_KEY]:
+            print(f"Skipping subreddit {subreddit[DISPLAY_NAME_KEY]} as it's quarantined")
+        elif subreddit[SUBREDDIT_TYPE_KEY] != 'private':
+            subreddit_model_list.append(reddit.subreddit(subreddit[DISPLAY_NAME_KEY]))
             continue
         else:
-            print(f"Skipping subreddit {subreddit['displayName']} as it's private")
-        skipped_resources['subreddits'].append(subreddit)
+            print(f"Skipping subreddit {subreddit[DISPLAY_NAME_KEY]} as it's private")
+        skipped_resources[SUBREDDITS_KEY].append(subreddit)
     batched_subreddit_model_list = []
     subreddit_model_batch = []
     for subreddit_model in subreddit_model_list:
@@ -227,6 +282,18 @@ def upload_subreddits_to_reddit(reddit, subreddits):
     print('Total subreddits uploaded:', subreddits_uploaded_count)
 
 
+def write_blocked_users_to_file(blocked_users):
+    """Write blocked users to file.
+    
+    Keyword arguments:
+    blocked_users -- the blocked users to save to the file
+    """
+    dictionary = {
+        BLOCKED_USERS_KEY: blocked_users
+    }
+    write_to_file(dictionary, BLOCKED_USERS_FILENAME)
+
+
 def write_multireddits_to_file(multireddits):
     """Write multireddits to file.
     
@@ -234,23 +301,15 @@ def write_multireddits_to_file(multireddits):
     multireddits -- the multireddits to save to the file
     """
     dictionary = {
-        'multireddits': multireddits
+        MULTIREDDITS_KEY: multireddits
     }
-    Path(DATA_DIRECTORY_NAME).mkdir(exist_ok=True, parents=True)
-    if exists(multireddits_filename) and not should_overwrite(f'\n{multireddits_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}'):
-        return
-    with open(multireddits_filename, 'w') as f:
-        json.dump(dictionary, f)
+    write_to_file(dictionary, MULTIREDDITS_FILENAME)
 
 
 def write_skipped_resources_to_file():
     """Write skipped resources to file."""
-    Path(DATA_DIRECTORY_NAME).mkdir(exist_ok=True, parents=True)
-    if exists(multireddits_filename) and not should_overwrite(f'\n{skipped_resources_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}'):
-        return
-    with open(skipped_resources_filename, 'w') as f:
-        json.dump(skipped_resources, f)
-    print(f'Skipped resources were written to {skipped_resources_filename}')
+    write_to_file(skipped_resources, SKIPPED_RESOURCES_FILENAME)
+    print(f'Skipped resources were written to {SKIPPED_RESOURCES_FILENAME}')
 
 
 def write_subreddits_to_file(subreddits):
@@ -260,63 +319,74 @@ def write_subreddits_to_file(subreddits):
     subreddits -- the subreddits to save to the file
     """
     dictionary = {
-        'subreddits': subreddits
+        SUBREDDITS_KEY: subreddits
     }
+    write_to_file(dictionary, SUBREDDITS_FILENAME)
+
+
+def write_to_file(dictionary, filename):
+    """Write the dictionary to the filename.
+    
+    Keyword arguments:
+    dictionary -- the dictionary to write
+    filename -- the filename
+    """
     Path(DATA_DIRECTORY_NAME).mkdir(exist_ok=True, parents=True)
-    if exists(multireddits_filename) and not should_overwrite(f'\n{subreddits_filename}{FILE_OVERWRITE_MESSAGE_SUFFIX}'):
+    if exists(filename) and not should_overwrite(f'\n{filename} already exists. Do you want to overwrite it?'):
         return
-    with open(subreddits_filename, 'w') as f:
+    with open(filename, 'w') as f:
         json.dump(dictionary, f)
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--download', action='store_true', help='Download data')
-parser.add_argument('-u', '--upload', action='store_true', help='Upload data')
+parser.add_argument('-d', '--download', action='store_true', help='Download resources from Reddit and save the resources to files in the data directory')
+parser.add_argument('-eb', '--exclude-blocked-users', action='store_true', help='Skip blocked user operations')
+parser.add_argument('-em', '--exclude-multireddits', action='store_true', help='Skip multireddit operations')
+parser.add_argument('-es', '--exclude-subreddits', action='store_true', help='Skip subreddit operations')
+parser.add_argument('-u', '--upload', action='store_true', help='Upload resources from the files in the data directory to Reddit')
 parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite data (local data or Reddit data) without confirming')
 args = parser.parse_args()
 
 skipped_resources = {
-    'multireddits': [],
-    'subreddits': [],
+    MULTIREDDITS_KEY: [],
+    SUBREDDITS_KEY: [],
 }
 
 if args.download:
     print('Downloading data from Reddit')
     account_credentials = None
-    if hasattr(config, 'DOWNLOAD_PASSWORD') and config.DOWNLOAD_PASSWORD and hasattr(config, 'DOWNLOAD_USERNAME') and config.DOWNLOAD_USERNAME:
+    if hasattr(config, DOWNLOAD_PASSWORD_VARIABLE_NAME) and config.DOWNLOAD_PASSWORD and hasattr(config, DOWNLOAD_USERNAME_VARIABLE_NAME) and config.DOWNLOAD_USERNAME:
         print(FOUND_ACCOUNT_CREDENTIALS_MESSAGE)
         account_credentials = (config.DOWNLOAD_PASSWORD, config.DOWNLOAD_USERNAME)
     else:
-        account_credentials = get_account_credentials(f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}download:')
-    reddit = praw.Reddit(
-        client_id=config.DOWNLOAD_CLIENT_ID,
-        client_secret=config.DOWNLOAD_CLIENT_SECRET,
-        password=account_credentials[0],
-        user_agent=USER_AGENT,
-        username=account_credentials[1],
-    )
-    multireddits = download_multireddits_from_reddit(reddit)
-    write_multireddits_to_file(multireddits)
-    subreddits = download_subreddits_from_reddit(reddit)
-    write_subreddits_to_file(subreddits)
+        account_credentials = get_account_credentials(GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD)
+    reddit = get_reddit(account_credentials, config.DOWNLOAD_CLIENT_ID, config.DOWNLOAD_CLIENT_SECRET, GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD)
+    if not args.exclude_blocked_users:
+        blocked_users = download_blocked_users_from_reddit(reddit)
+        write_blocked_users_to_file(blocked_users)
+    if not args.exclude_multireddits:
+        multireddits = download_multireddits_from_reddit(reddit)
+        write_multireddits_to_file(multireddits)
+    if not args.exclude_subreddits:
+        subreddits = download_subreddits_from_reddit(reddit)
+        write_subreddits_to_file(subreddits)
 
 if args.upload:
     print_message_prepend_newline('Uploading data to Reddit', args.download)
     account_credentials = None
-    if hasattr(config, 'UPLOAD_PASSWORD') and config.UPLOAD_PASSWORD and hasattr(config, 'UPLOAD_USERNAME') and config.UPLOAD_USERNAME:
+    if hasattr(config, UPLOAD_PASSWORD_VARIABLE_NAME) and config.UPLOAD_PASSWORD and hasattr(config, UPLOAD_USERNAME_VARIABLE_NAME) and config.UPLOAD_USERNAME:
         print(FOUND_ACCOUNT_CREDENTIALS_MESSAGE)
         account_credentials = (config.UPLOAD_PASSWORD, config.UPLOAD_USERNAME)
     else:
-        account_credentials = get_account_credentials(f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}upload:')
-    reddit = praw.Reddit(
-        client_id=config.UPLOAD_CLIENT_ID,
-        client_secret=config.UPLOAD_CLIENT_SECRET,
-        password=account_credentials[0],
-        user_agent=USER_AGENT,
-        username=account_credentials[1],
-    )
-    multireddits = get_multireddits_from_file()
-    upload_multireddits_to_reddit(multireddits, reddit)
-    subreddits = get_subreddits_from_file()
-    upload_subreddits_to_reddit(reddit, subreddits)
+        account_credentials = get_account_credentials(GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD)
+    reddit = get_reddit(account_credentials, config.UPLOAD_CLIENT_ID, config.UPLOAD_CLIENT_SECRET, GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD)
+    if not args.exclude_blocked_users:
+        blocked_users = get_from_file(BLOCKED_USERS_FILENAME, BLOCKED_USERS_KEY)
+        upload_blocked_users_to_reddit(blocked_users, reddit)
+    if not args.exclude_multireddits:
+        multireddits = get_from_file(MULTIREDDITS_FILENAME, MULTIREDDITS_KEY)
+        upload_multireddits_to_reddit(multireddits, reddit)
+    if not args.exclude_subreddits:
+        subreddits = get_from_file(SUBREDDITS_FILENAME, SUBREDDITS_KEY)
+        upload_subreddits_to_reddit(reddit, subreddits)
     write_skipped_resources_to_file()

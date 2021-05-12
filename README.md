@@ -23,3 +23,51 @@ UPLOAD_CLIENT_SECRET = ''
 UPLOAD_PASSWORD = ''
 UPLOAD_USERNAME = ''
 ```
+## Optional arguments
+--download (-d)
+- Download resources from Reddit (optionally using the DOWNLOAD username and password from the config.py file) and save the resources to files in the data directory
+- Can be used with --upload (-u) and --exclude arguments
+```
+py main.py -d
+py main.py --download
+```
+
+--upload (-u)
+- Upload resources from the files in the data directory to Reddit (optionally using the UPLOAD username and password from the config.py file)
+- Can be used with --download (-d) and --exclude arguments
+```
+py main.py -u
+py main.py --upload
+```
+
+--exclude-blocked-users (-eb)
+- Skip blocked user operations
+- Can be used with --download (-d) and --upload (-u) and with other --exclude arguments
+```
+py main.py -d -eb
+py main.py -d --exclude-blocked-users
+```
+
+--exclude-multireddits (-em)
+- Skip multireddit operations
+- Can be used with --download (-d) and --upload (-u) and with other --exclude arguments
+```
+py main.py -d -em
+py main.py -d --exclude-multireddits
+```
+
+--exclude-subreddits (-es)
+- Skip subreddit operations
+- Can be used with --download (-d) and --upload (-u) and with other --exclude arguments
+```
+py main.py -d -es
+py main.py -d --exclude-subreddits
+```
+
+--overwrite (-o)
+- Overwrite data (local data or Reddit data) without confirming
+- Can be used with --download (-d) and --upload (-u) and with other --exclude arguments
+```
+py main.py -d -o
+py main.py -d --overwrite
+```
