@@ -11,6 +11,8 @@ import prawcore
 
 import config
 
+# to do support saved posts
+
 BLOCKED_USERS_KEY = 'blockedUsers'
 DATA_DIRECTORY_NAME = 'data'
 DISPLAY_NAME_KEY = 'displayName'
