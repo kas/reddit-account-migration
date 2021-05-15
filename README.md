@@ -42,7 +42,7 @@ py main.py --download
 --include-remindmebot-reminders (-ir)
 - Include remindmebot reminder operations (to do)
 - Can be used with --download (-d) and --upload (-u) and with other --skip arguments
-- Downloading remindmebot reminders works fine, but uploading remindmebot reminders hasn't been successfully tested (that's why this argument is marked with to do). If you get an error when trying to upload remindmebot reminders, then it's possible your Reddit account is too new to send messages to other users. Please try this function again when your Reddit account has higher karma.
+- Downloading remindmebot reminders works fine, but uploading remindmebot reminders hasn't been successfully tested (that's why this argument is marked with to do). If you get an error (e.g., RESTRICTED_TO_PM) when trying to upload remindmebot reminders, then it's possible your Reddit account is too new to send messages to other users. Please try this function again when your Reddit account has higher karma.
 ```
 py main.py -d -ir
 py main.py -d --include-remindmebot-reminders
