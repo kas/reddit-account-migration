@@ -6,12 +6,11 @@ import json
 import sys
 import time
 
+from praw.models import Comment, Submission
 import praw
 import prawcore
 
 import config
-
-# to do support saved posts
 
 BLOCKED_USERS_KEY = 'blockedUsers'
 DATA_DIRECTORY_NAME = 'data'
@@ -22,6 +21,7 @@ FOUND_ACCOUNT_CREDENTIALS_MESSAGE = 'Found Reddit account credentials from confi
 GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX = '\nEnter Reddit account credentials for '
 IS_QUARANTINED_KEY = 'isQuarantined'
 MULTIREDDITS_KEY = 'multireddits'
+SAVED_RESOURCES_KEY = 'savedResources'
 SUBREDDIT_TYPE_KEY = 'subredditType'
 SUBREDDITS_KEY = 'subreddits'
 UPLOAD_PASSWORD_VARIABLE_NAME = 'UPLOAD_PASSWORD'
@@ -33,6 +33,7 @@ BLOCKED_USERS_FILENAME = f'{DATA_DIRECTORY_NAME}/blocked-users.json'
 GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD = f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}download:'
 GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD = f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}upload:'
 MULTIREDDITS_FILENAME = f'{DATA_DIRECTORY_NAME}/multireddits.json'
+SAVED_RESOURCES_FILENAME = f'{DATA_DIRECTORY_NAME}/saved-resources.json'
 SKIPPED_RESOURCES_FILENAME = f'{DATA_DIRECTORY_NAME}/skipped-resources.json'
 SUBREDDITS_FILENAME = f'{DATA_DIRECTORY_NAME}/subreddits.json'
 
@@ -70,6 +71,36 @@ def download_multireddits_from_reddit(reddit, should_prepend_newline=True):
         print('Multireddits downloaded:', len(multireddits_list))
     print('Total multireddits downloaded:', len(multireddits_list))
     return multireddits_list
+
+
+def download_saved_resources_from_reddit(reddit):
+    """Download saved resources from Reddit and return them.
+    
+    Keyword arguments:
+    reddit -- the PRAW Reddit instance
+    """
+    print('\nDownloading saved resources from Reddit')
+    saved_resources = reddit.user.me().saved(limit=None)
+    saved_resources_list = []
+    for saved_resource in saved_resources:
+        saved_resource_type = None
+        if isinstance(saved_resource, Comment):
+            saved_resource_type = 'comment'
+        elif isinstance(saved_resource, Submission):
+            saved_resource_type = 'submission'
+        else:
+            print('\n\n\nERROR new saved resource type')
+            print(saved_resource)
+            continue
+        saved_resources_list.append({
+            'authorName': saved_resource.author if not saved_resource.author else saved_resource.author.name,
+            'permalink': saved_resource.permalink,
+            'savedResourceType': saved_resource_type,
+            'title': saved_resource.title if not hasattr(saved_resource, 'submission') else saved_resource.submission.title,
+        })
+        print('Saved resources downloaded:', len(saved_resources_list))
+    print('Total saved resources downloaded:', len(saved_resources_list))
+    return saved_resources_list
 
 
 def download_subreddits_from_reddit(reddit):
@@ -308,6 +339,18 @@ def write_multireddits_to_file(multireddits):
     write_to_file(dictionary, MULTIREDDITS_FILENAME)
 
 
+def write_saved_resources_to_file(saved_resources):
+    """Write saved resources to file.
+    
+    Keyword arguments:
+    saved_resources -- the saved resources to save to the file
+    """
+    dictionary = {
+        SAVED_RESOURCES_KEY: saved_resources
+    }
+    write_to_file(dictionary, SAVED_RESOURCES_FILENAME)
+
+
 def write_skipped_resources_to_file():
     """Write skipped resources to file."""
     write_to_file(skipped_resources, SKIPPED_RESOURCES_FILENAME)
@@ -342,11 +385,12 @@ def write_to_file(dictionary, filename):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--download', action='store_true', help='Download resources from Reddit and save the resources to files in the data directory')
-parser.add_argument('-eb', '--exclude-blocked-users', action='store_true', help='Skip blocked user operations')
-parser.add_argument('-em', '--exclude-multireddits', action='store_true', help='Skip multireddit operations')
-parser.add_argument('-es', '--exclude-subreddits', action='store_true', help='Skip subreddit operations')
-parser.add_argument('-u', '--upload', action='store_true', help='Upload resources from the files in the data directory to Reddit')
+parser.add_argument('-isr', '--include-saved-resources', action='store_true', help='Include saved resource operations (to do)')
 parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite data (local data or Reddit data) without confirming')
+parser.add_argument('-sb', '--skip-blocked-users', action='store_true', help='Skip blocked user operations')
+parser.add_argument('-sm', '--skip-multireddits', action='store_true', help='Skip multireddit operations')
+parser.add_argument('-ss', '--skip-subreddits', action='store_true', help='Skip subreddit operations')
+parser.add_argument('-u', '--upload', action='store_true', help='Upload resources from the files in the data directory to Reddit')
 args = parser.parse_args()
 
 skipped_resources = {
@@ -363,13 +407,16 @@ if args.download:
     else:
         account_credentials = get_account_credentials(GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD)
     reddit = get_reddit(account_credentials, config.DOWNLOAD_CLIENT_ID, config.DOWNLOAD_CLIENT_SECRET, GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD)
-    if not args.exclude_blocked_users:
+    if args.include_saved_resources:
+        saved_resources = download_saved_resources_from_reddit(reddit)
+        write_saved_resources_to_file(saved_resources)
+    if not args.skip_blocked_users:
         blocked_users = download_blocked_users_from_reddit(reddit)
         write_blocked_users_to_file(blocked_users)
-    if not args.exclude_multireddits:
+    if not args.skip_multireddits:
         multireddits = download_multireddits_from_reddit(reddit)
         write_multireddits_to_file(multireddits)
-    if not args.exclude_subreddits:
+    if not args.skip_subreddits:
         subreddits = download_subreddits_from_reddit(reddit)
         write_subreddits_to_file(subreddits)
 
@@ -382,13 +429,17 @@ if args.upload:
     else:
         account_credentials = get_account_credentials(GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD)
     reddit = get_reddit(account_credentials, config.UPLOAD_CLIENT_ID, config.UPLOAD_CLIENT_SECRET, GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD)
-    if not args.exclude_blocked_users:
+    # To do
+    # if args.include_saved_resources:
+    #     saved_resources = get_from_file(SAVED_RESOURCES_FILENAME, SAVED_RESOURCES_KEY)
+    #     upload_saved_resources_to_reddit(reddit, saved_resources)
+    if not args.skip_blocked_users:
         blocked_users = get_from_file(BLOCKED_USERS_FILENAME, BLOCKED_USERS_KEY)
         upload_blocked_users_to_reddit(blocked_users, reddit)
-    if not args.exclude_multireddits:
+    if not args.skip_multireddits:
         multireddits = get_from_file(MULTIREDDITS_FILENAME, MULTIREDDITS_KEY)
         upload_multireddits_to_reddit(multireddits, reddit)
-    if not args.exclude_subreddits:
+    if not args.skip_subreddits:
         subreddits = get_from_file(SUBREDDITS_FILENAME, SUBREDDITS_KEY)
         upload_subreddits_to_reddit(reddit, subreddits)
     write_skipped_resources_to_file()
