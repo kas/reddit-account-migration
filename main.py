@@ -1,6 +1,7 @@
 from os.path import exists
 from pathlib import Path
 import argparse
+import datetime
 import getpass
 import json
 import sys
@@ -14,6 +15,7 @@ import config
 
 BLOCKED_USERS_KEY = 'blockedUsers'
 DATA_DIRECTORY_NAME = 'data'
+DATETIME_KEY = 'datetime'
 DISPLAY_NAME_KEY = 'displayName'
 DOWNLOAD_PASSWORD_VARIABLE_NAME = 'DOWNLOAD_PASSWORD'
 DOWNLOAD_USERNAME_VARIABLE_NAME = 'DOWNLOAD_USERNAME'
@@ -21,21 +23,66 @@ FOUND_ACCOUNT_CREDENTIALS_MESSAGE = 'Found Reddit account credentials from confi
 GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX = '\nEnter Reddit account credentials for '
 IS_QUARANTINED_KEY = 'isQuarantined'
 MULTIREDDITS_KEY = 'multireddits'
+REMINDMEBOT_MESSAGE_BODY = 'MyReminders!'
+REMINDMEBOT_MESSAGE_SUBJECT = 'RemindMe'
+REMINDMEBOT_REMINDERS_KEY = 'remindmebotReminders'
+REMINDMEBOT_USERNAME = 'RemindMeBot'
 SAVED_RESOURCES_KEY = 'savedResources'
+SOURCE_KEY = 'source'
 SUBREDDIT_TYPE_KEY = 'subredditType'
 SUBREDDITS_KEY = 'subreddits'
 UPLOAD_PASSWORD_VARIABLE_NAME = 'UPLOAD_PASSWORD'
 UPLOAD_USERNAME_VARIABLE_NAME = 'UPLOAD_USERNAME'
 USER_AGENT = 'reddit-account-migration'
 VISIBILITY_KEY = 'visibility'
+WAITING_TO_CHECK_REDDIT_INBOX_MESSAGE = 'Waiting 10 seconds to check Reddit inbox'
 
 BLOCKED_USERS_FILENAME = f'{DATA_DIRECTORY_NAME}/blocked-users.json'
 GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD = f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}download:'
 GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD = f'{GET_ACCOUNT_CREDENTIALS_MESSAGE_PREFIX}upload:'
 MULTIREDDITS_FILENAME = f'{DATA_DIRECTORY_NAME}/multireddits.json'
+REMINDMEBOT_REMINDERS_FILENAME = f'{DATA_DIRECTORY_NAME}/remindmebot-reminders.json'
 SAVED_RESOURCES_FILENAME = f'{DATA_DIRECTORY_NAME}/saved-resources.json'
 SKIPPED_RESOURCES_FILENAME = f'{DATA_DIRECTORY_NAME}/skipped-resources.json'
 SUBREDDITS_FILENAME = f'{DATA_DIRECTORY_NAME}/subreddits.json'
+
+
+def download_remindmebot_reminders_from_reddit(reddit):
+    """Download remindmebot reminders from Reddit and return them.
+    
+    Keyword arguments:
+    reddit -- the PRAW Reddit instance
+    """
+    print('\nDownloading remindmebot reminders from Reddit')
+    remindmebot_reminders = []
+    message_sent_timestamp = datetime.datetime.now().timestamp()
+    print('Messaging RemindMeBot to get current reminders')
+    reddit.redditor(REMINDMEBOT_USERNAME).message(REMINDMEBOT_MESSAGE_SUBJECT, REMINDMEBOT_MESSAGE_BODY)
+    print(WAITING_TO_CHECK_REDDIT_INBOX_MESSAGE)
+    remindmebot_message = None
+    while not remindmebot_message:
+        time.sleep(10)
+        print('Checking Reddit inbox for reply from RemindMeBot')
+        messages = reddit.inbox.messages(limit=None)
+        for message in messages:
+            if message.author and message.author.name == reddit.user.me().name and message.body == REMINDMEBOT_MESSAGE_BODY and message.subject == REMINDMEBOT_MESSAGE_SUBJECT and message.created_utc >= message_sent_timestamp and message.replies:
+                remindmebot_message = message.replies[0].body
+                break
+            elif message.created_utc < message_sent_timestamp:
+                print("Didn't find reply from RemindMeBot")
+                break
+        print(f'{WAITING_TO_CHECK_REDDIT_INBOX_MESSAGE} again')
+    for line in remindmebot_message.split('\n'):
+        if line.startswith('|[Source](https://'):
+            line_segments = line.split('|')
+            source = line_segments[2] if line_segments[2] else line_segments[1].split('(')[-1].replace(')', '')
+            reminder_datetime = line_segments[3].split('**')[1]
+            remindmebot_reminders.append({
+                DATETIME_KEY: reminder_datetime,
+                SOURCE_KEY: source,
+            })
+    print('Total remindmebot reminders downloaded:', len(remindmebot_reminders))
+    return remindmebot_reminders
 
 
 def download_blocked_users_from_reddit(reddit):
@@ -152,6 +199,18 @@ def get_account_credentials(message):
             exit_script()
         confirm_password, password = get_password()
     return (password, username)
+
+
+def get_dictionary(key, resources):
+    """Return a new dictionary using the given key and resources (key value).
+
+    Keyword arguments:
+    key -- the key to use in the dictionary
+    resources -- the resources to use as the key value
+    """
+    return {
+        key: resources,
+    }
 
 
 def get_from_file(filename, key):
@@ -277,6 +336,32 @@ def upload_multireddits_to_reddit(multireddits, reddit):
     print('Total multireddits uploaded:', multireddits_uploaded_count)
 
 
+def upload_remindmebot_reminders_to_reddit(reddit, remindmebot_reminders):
+    """Upload remindmebot reminders to Reddit.
+    
+    Keyword arguments:
+    reddit -- the PRAW Reddit instance
+    remindmebot_reminders -- the remindmebot reminders to upload to Reddit
+    """
+    print('\nUploading remindmebot reminders to Reddit')
+    if not should_overwrite(reddit=reddit):
+        return
+    remindmebot_reminders_uploaded_count = 0
+    error_encountered = False
+    for remindmebot_reminder in [remindmebot_reminders[0]]:
+        try:
+            reddit.redditor(REMINDMEBOT_USERNAME).message(REMINDMEBOT_MESSAGE_SUBJECT, f'RemindMe! {remindmebot_reminder[DATETIME_KEY]} "{remindmebot_reminder[SOURCE_KEY]}"')
+            remindmebot_reminders_uploaded_count += 1
+        except praw.exceptions.RedditAPIException as exception:
+            error_encountered = True
+            skipped_resources[REMINDMEBOT_REMINDERS_KEY].append(remindmebot_reminder)
+            for subexception in exception.items:
+                print(f'\nException: {subexception.error_type}')
+            print("\nError: RedditAPIException. If the error above is about RESTRICTED_TO_PM, it's possible your Reddit account is too new to send messages to other users. Please try this function again when your Reddit account has higher karma.")
+        print_message_prepend_newline(f'Remindmebot reminders uploaded: {remindmebot_reminders_uploaded_count}', error_encountered)
+    print('Total remindmebot reminders uploaded:', remindmebot_reminders_uploaded_count)
+
+
 def upload_subreddits_to_reddit(reddit, subreddits):
     """Upload subreddits to Reddit, skipping subreddits that are private or quarantined.
     
@@ -315,58 +400,10 @@ def upload_subreddits_to_reddit(reddit, subreddits):
     print('Total subreddits uploaded:', subreddits_uploaded_count)
 
 
-def write_blocked_users_to_file(blocked_users):
-    """Write blocked users to file.
-    
-    Keyword arguments:
-    blocked_users -- the blocked users to save to the file
-    """
-    dictionary = {
-        BLOCKED_USERS_KEY: blocked_users
-    }
-    write_to_file(dictionary, BLOCKED_USERS_FILENAME)
-
-
-def write_multireddits_to_file(multireddits):
-    """Write multireddits to file.
-    
-    Keyword arguments:
-    multireddits -- the multireddits to save to the file
-    """
-    dictionary = {
-        MULTIREDDITS_KEY: multireddits
-    }
-    write_to_file(dictionary, MULTIREDDITS_FILENAME)
-
-
-def write_saved_resources_to_file(saved_resources):
-    """Write saved resources to file.
-    
-    Keyword arguments:
-    saved_resources -- the saved resources to save to the file
-    """
-    dictionary = {
-        SAVED_RESOURCES_KEY: saved_resources
-    }
-    write_to_file(dictionary, SAVED_RESOURCES_FILENAME)
-
-
 def write_skipped_resources_to_file():
     """Write skipped resources to file."""
     write_to_file(skipped_resources, SKIPPED_RESOURCES_FILENAME)
     print(f'Skipped resources were written to {SKIPPED_RESOURCES_FILENAME}')
-
-
-def write_subreddits_to_file(subreddits):
-    """Write subreddits to file.
-    
-    Keyword arguments:
-    subreddits -- the subreddits to save to the file
-    """
-    dictionary = {
-        SUBREDDITS_KEY: subreddits
-    }
-    write_to_file(dictionary, SUBREDDITS_FILENAME)
 
 
 def write_to_file(dictionary, filename):
@@ -385,7 +422,8 @@ def write_to_file(dictionary, filename):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--download', action='store_true', help='Download resources from Reddit and save the resources to files in the data directory')
-parser.add_argument('-isr', '--include-saved-resources', action='store_true', help='Include saved resource operations (to do)')
+parser.add_argument('-ir', '--include-remindmebot-reminders', action='store_true', help='Include remindmebot reminder operations (to do)')
+parser.add_argument('-is', '--include-saved-resources', action='store_true', help='Include saved resource operations (to do)')
 parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite data (local data or Reddit data) without confirming')
 parser.add_argument('-sb', '--skip-blocked-users', action='store_true', help='Skip blocked user operations')
 parser.add_argument('-sm', '--skip-multireddits', action='store_true', help='Skip multireddit operations')
@@ -395,6 +433,7 @@ args = parser.parse_args()
 
 skipped_resources = {
     MULTIREDDITS_KEY: [],
+    REMINDMEBOT_REMINDERS_KEY: [],
     SUBREDDITS_KEY: [],
 }
 
@@ -407,18 +446,21 @@ if args.download:
     else:
         account_credentials = get_account_credentials(GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD)
     reddit = get_reddit(account_credentials, config.DOWNLOAD_CLIENT_ID, config.DOWNLOAD_CLIENT_SECRET, GET_ACCOUNT_CREDENTIALS_MESSAGE_DOWNLOAD)
+    if args.include_remindmebot_reminders:
+        remindmebot_reminders = download_remindmebot_reminders_from_reddit(reddit)
+        write_to_file(get_dictionary(REMINDMEBOT_REMINDERS_KEY, remindmebot_reminders), REMINDMEBOT_REMINDERS_FILENAME)
     if args.include_saved_resources:
         saved_resources = download_saved_resources_from_reddit(reddit)
-        write_saved_resources_to_file(saved_resources)
+        write_to_file(get_dictionary(SAVED_RESOURCES_KEY, saved_resources), SAVED_RESOURCES_FILENAME)
     if not args.skip_blocked_users:
         blocked_users = download_blocked_users_from_reddit(reddit)
-        write_blocked_users_to_file(blocked_users)
+        write_to_file(get_dictionary(BLOCKED_USERS_KEY, blocked_users), BLOCKED_USERS_FILENAME)
     if not args.skip_multireddits:
         multireddits = download_multireddits_from_reddit(reddit)
-        write_multireddits_to_file(multireddits)
+        write_to_file(get_dictionary(MULTIREDDITS_KEY, multireddits), MULTIREDDITS_FILENAME)
     if not args.skip_subreddits:
         subreddits = download_subreddits_from_reddit(reddit)
-        write_subreddits_to_file(subreddits)
+        write_to_file(get_dictionary(SUBREDDITS_KEY, subreddits), SUBREDDITS_FILENAME)
 
 if args.upload:
     print_message_prepend_newline('Uploading data to Reddit', args.download)
@@ -429,6 +471,9 @@ if args.upload:
     else:
         account_credentials = get_account_credentials(GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD)
     reddit = get_reddit(account_credentials, config.UPLOAD_CLIENT_ID, config.UPLOAD_CLIENT_SECRET, GET_ACCOUNT_CREDENTIALS_MESSAGE_UPLOAD)
+    if args.include_remindmebot_reminders:
+        remindmebot_reminders = get_from_file(REMINDMEBOT_REMINDERS_FILENAME, REMINDMEBOT_REMINDERS_KEY)
+        upload_remindmebot_reminders_to_reddit(reddit, remindmebot_reminders)
     # To do
     # if args.include_saved_resources:
     #     saved_resources = get_from_file(SAVED_RESOURCES_FILENAME, SAVED_RESOURCES_KEY)
