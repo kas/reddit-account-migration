@@ -242,7 +242,7 @@ def upload_blocked_users_to_reddit(blocked_users, reddit):
     reddit -- the PRAW Reddit instance
     """
     print('\nUploading blocked users to Reddit')
-    if not should_overwrite():
+    if not should_overwrite(reddit=reddit):
         return
     blocked_users_uploaded_count = 0
     for blocked_user in blocked_users:
@@ -263,7 +263,7 @@ def upload_multireddits_to_reddit(multireddits, reddit):
     print('Downloading existing multireddits to prevent collisions')
     existing_multireddits = download_multireddits_from_reddit(reddit, False)
     existing_multireddits = [existing_multireddit[DISPLAY_NAME_KEY] for existing_multireddit in existing_multireddits]
-    if not should_overwrite():
+    if not should_overwrite(reddit=reddit):
         return
     multireddits_uploaded_count = 0
     for multireddit in multireddits:
@@ -285,7 +285,7 @@ def upload_subreddits_to_reddit(reddit, subreddits):
     subreddits -- the subreddits to upload to Reddit
     """
     print('\nUploading subreddits to Reddit')
-    if not should_overwrite():
+    if not should_overwrite(reddit=reddit):
         return
     subreddit_model_list = []
     for subreddit in subreddits:
