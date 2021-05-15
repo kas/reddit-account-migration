@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "args": ["-d", "-u", "-o"],
+            "args": ["-d", "-o", "-u"],
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
