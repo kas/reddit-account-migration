@@ -226,7 +226,6 @@ def get_from_file(filename, key):
         dictionary = json.load(f)
         resource = dictionary[key]
         return resource
-    return resource
 
 
 def get_password():
