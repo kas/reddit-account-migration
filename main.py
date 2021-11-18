@@ -375,6 +375,8 @@ def upload_subreddits_to_reddit(reddit, subreddits):
     for subreddit in subreddits:
         if subreddit[IS_QUARANTINED_KEY]:
             print(f"Skipping subreddit {subreddit[DISPLAY_NAME_KEY]} as it's quarantined")
+        elif subreddit[SUBREDDIT_TYPE_KEY] == "user":
+            print(f"Skipping subreddit {subreddit[DISPLAY_NAME_KEY]} as it's a user")
         elif subreddit[SUBREDDIT_TYPE_KEY] != 'private':
             subreddit_model_list.append(reddit.subreddit(subreddit[DISPLAY_NAME_KEY]))
             continue
