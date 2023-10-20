@@ -395,7 +395,7 @@ def upload_subreddits_to_reddit(reddit, subreddits):
         reddit.subreddit(subreddit_model_batch[0].display_name).subscribe(other_subreddits=subreddit_model_batch[1:])
         subreddits_uploaded_count += len(subreddit_model_batch)
         print('Subreddits uploaded:', subreddits_uploaded_count)
-        time.sleep(1)
+        time.sleep(10)
     print('Total subreddits uploaded:', subreddits_uploaded_count)
 
 
