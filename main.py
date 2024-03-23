@@ -398,6 +398,25 @@ def upload_subreddits_to_reddit(reddit, subreddits):
         time.sleep(10)
     print('Total subreddits uploaded:', subreddits_uploaded_count)
 
+def upload_saved_resources_to_reddit(reddit, saved_resources):
+    """Upload saved resources to Reddit.
+    
+    Keyword arguments:
+    reddit -- the PRAW Reddit instance
+    saved_resources -- the saved resources to upload to Reddit
+    """
+    print('\nUploading saved resources to Reddit')
+    "Reverse the list so that the sorting will be preserved"
+    saved_resources.reverse()
+    saved_resources_uploaded_count = 0
+    for resource in saved_resources:
+        if resource['savedResourceType'] == 'submission':
+            reddit.submission(url='https://reddit.com' + resource['permalink']).save()
+        elif resource['savedResourceType'] == 'comment':
+            reddit.comment(url='https://reddit.com' + resource['permalink']).save()
+        saved_resources_uploaded_count += 1
+        print('Saved resources uploaded:', saved_resources_uploaded_count)
+    print('Total saved resources uploaded:', saved_resources_uploaded_count)
 
 def write_skipped_resources_to_file():
     """Write skipped resources to file."""
@@ -473,10 +492,9 @@ if args.upload:
     if args.include_remindmebot_reminders:
         remindmebot_reminders = get_from_file(REMINDMEBOT_REMINDERS_FILENAME, REMINDMEBOT_REMINDERS_KEY)
         upload_remindmebot_reminders_to_reddit(reddit, remindmebot_reminders)
-    # To do
-    # if args.include_saved_resources:
-    #     saved_resources = get_from_file(SAVED_RESOURCES_FILENAME, SAVED_RESOURCES_KEY)
-    #     upload_saved_resources_to_reddit(reddit, saved_resources)
+    if args.include_saved_resources:
+        saved_resources = get_from_file(SAVED_RESOURCES_FILENAME, SAVED_RESOURCES_KEY)
+        upload_saved_resources_to_reddit(reddit, saved_resources)
     if not args.skip_blocked_users:
         blocked_users = get_from_file(BLOCKED_USERS_FILENAME, BLOCKED_USERS_KEY)
         upload_blocked_users_to_reddit(blocked_users, reddit)
